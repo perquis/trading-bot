@@ -1,5 +1,6 @@
-import { ITrade } from '@/interfaces/trade.interface';
-import mongoose from 'mongoose';
+import { CryptoSymbol } from "@/enums/crypto-symbol";
+import { ITrade } from "@/interfaces/trade.interface";
+import mongoose from "mongoose";
 
 const tradeSchema = new mongoose.Schema<ITrade>({
   id: {
@@ -9,6 +10,11 @@ const tradeSchema = new mongoose.Schema<ITrade>({
   price: {
     type: String,
     required: true,
+  },
+  symbol: {
+    type: String,
+    required: true,
+    enum: [...Object.values(CryptoSymbol)],
   },
   qty: {
     type: String,
@@ -32,4 +38,4 @@ const tradeSchema = new mongoose.Schema<ITrade>({
   },
 });
 
-export const TradeModel = mongoose.model('Trade', tradeSchema);
+export const TradeModel = mongoose.model("Trade", tradeSchema);

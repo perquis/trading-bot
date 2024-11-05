@@ -1,12 +1,12 @@
-import { IBuyingOrSellingOptions, IBuyOrSellOrdersOptions } from "@/interfaces/bot-trader.interface";
+import { ICryptocurrencyOptions, IOrderDetails } from "@/interfaces/bot-trader.interface";
 import { services } from "@/services";
 import { calculatedPriceWithTreshold } from "@/utils/calculated-price-with-treshold";
 import { OrderSide } from "binance-api-node";
 
 export class Trader {
-  static async init({ symbol, dropTreshold, riseTreshold, quantity }: IBuyOrSellOrdersOptions) {
+  static async init({ symbol, quantity, dropTreshold, riseTreshold }: ICryptocurrencyOptions) {
     try {
-      const lastTrade = await services.trades.getLastTrade();
+      const lastTrade = await services.trades.getLastTrade(symbol);
 
       const latestPrice = parseFloat(lastTrade!.price),
         newOrder = {
@@ -16,7 +16,7 @@ export class Trader {
           quantity,
         };
 
-      const lastOrder = await services.orders.getLastOrder();
+      const lastOrder = await services.orders.getLastOrder(symbol);
       if (!lastOrder) return await services.orders.createOrder(newOrder);
 
       const previousPrice = lastOrder.price,
@@ -32,11 +32,11 @@ export class Trader {
     }
   }
 
-  static #isBuying({ treshold, latestPrice, previousPrice }: IBuyingOrSellingOptions): boolean {
+  static #isBuying({ treshold, latestPrice, previousPrice }: IOrderDetails): boolean {
     return latestPrice < calculatedPriceWithTreshold(previousPrice, -treshold);
   }
 
-  static #isSelling({ treshold, latestPrice, previousPrice }: IBuyingOrSellingOptions): boolean {
+  static #isSelling({ treshold, latestPrice, previousPrice }: IOrderDetails): boolean {
     return latestPrice > calculatedPriceWithTreshold(previousPrice, treshold);
   }
 }

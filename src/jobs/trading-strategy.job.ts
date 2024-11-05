@@ -1,18 +1,13 @@
 import { Trader } from "@/bot/trader";
 import { connectWithMongoDb } from "@/db/mongodb";
-import { CryptoSymbol } from "@/enums/crypto-symbol";
+import { ICryptocurrencyOptions } from "@/interfaces/bot-trader.interface";
 import { services } from "@/services";
 
 connectWithMongoDb();
 
-export const tradingStrategy = async () => {
-  const trades = await services.trades.getTrades(CryptoSymbol.BTCUSDT);
-  await services.trades.storeTradesInDatabase(trades!);
+export const tradingStrategy = (options: ICryptocurrencyOptions) => async () => {
+  const trades = await services.trades.getTrades(options.symbol);
+  await services.trades.storeTradesInDatabase(trades!, options.symbol);
 
-  await Trader.init({
-    symbol: CryptoSymbol.BTCUSDT,
-    dropTreshold: 1,
-    riseTreshold: 1,
-    quantity: 0.01,
-  });
+  await Trader.init(options);
 };

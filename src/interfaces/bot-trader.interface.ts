@@ -1,13 +1,13 @@
 import { CryptoSymbol } from "@/enums/crypto-symbol";
 
-export interface IBuyOrSellOrdersOptions {
+export interface ICryptocurrencyOptions {
   symbol: CryptoSymbol;
   dropTreshold: number;
   riseTreshold: number;
   quantity: number;
 }
 
-export interface IBuyingOrSellingOptions {
+export interface IOrderDetails {
   latestPrice: number;
   previousPrice: number;
   treshold: number;

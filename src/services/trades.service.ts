@@ -12,17 +12,22 @@ export const trades = {
     }
   },
 
-  async storeTradesInDatabase(trades: TradeResult[]) {
+  async storeTradesInDatabase(trades: TradeResult[], symbol: CryptoSymbol) {
     try {
+      trades = trades.map((trade) => ({
+        ...trade,
+        symbol,
+      }));
+
       await TradeModel.insertMany(trades);
     } catch (error) {
       console.error("Error storing trades:", error);
     }
   },
 
-  async getLastTrade() {
+  async getLastTrade(symbol: CryptoSymbol) {
     try {
-      const trade = await TradeModel.findOne().sort({ time: -1 }).lean();
+      const trade = await TradeModel.findOne({ symbol }).sort({ time: -1 }).lean();
       return trade;
     } catch (error) {
       console.error("Error fetching last trade:", error);
