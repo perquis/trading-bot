@@ -1,85 +1,45 @@
-import { CryptoSymbol } from '@/enums/crypto-symbol';
-import { TradeModel } from '@/models/TradeModel';
-import { binance } from '@/services/binance';
-import { OrderType, TradeResult } from 'binance-api-node';
-
-interface IBuyOrSellOrdersOptions {
-  symbol: CryptoSymbol;
-  dropTreshold: number;
-  riseTreshold: number;
-  quantity: number;
-}
+import { IBuyingOrSellingOptions, IBuyOrSellOrdersOptions } from "@/interfaces/bot-trader.interface";
+import { services } from "@/services";
+import { calculatedPriceWithTreshold } from "@/utils/calculated-price-with-treshold";
+import { OrderSide } from "binance-api-node";
 
 export class Trader {
-  static #lastBuyPrice: number | null = null;
-
-  static #calculateCryptoCost(buyPrice: number, quantity: number): string {
-    return Intl.NumberFormat('en-ES', { currency: 'USD', style: 'currency' }).format(buyPrice * quantity);
-  }
-
-  static async getLastTrade() {
-    return await TradeModel.findOne().sort({ time: -1 }).lean();
-  }
-
-  static async getTrades(symbol: CryptoSymbol) {
+  static async init({ symbol, dropTreshold, riseTreshold, quantity }: IBuyOrSellOrdersOptions) {
     try {
-      return await binance.trades({ symbol });
+      const lastTrade = await services.trades.getLastTrade();
+      if (!lastTrade) throw new Error("No trades found");
+
+      const latestPrice = parseFloat(lastTrade.price),
+        newOrder = {
+          symbol,
+          price: latestPrice,
+          side: OrderSide.BUY,
+          quantity,
+        };
+
+      const lastOrder = await services.orders.getLastOrder();
+      if (!lastOrder) return await services.orders.createOrder(newOrder);
+
+      const previousPrice = lastOrder.price,
+        buyingOrSellingOptions = { latestPrice, previousPrice };
+
+      const isBuying = this.#isBuying({ treshold: dropTreshold, ...buyingOrSellingOptions }),
+        isSelling = this.#isSelling({ treshold: riseTreshold, ...buyingOrSellingOptions });
+
+      if (isBuying && lastOrder.side === OrderSide.SELL) return await services.orders.createOrder(newOrder);
+
+      if (isSelling && lastOrder.side === OrderSide.BUY)
+        return await services.orders.createOrder({ ...newOrder, side: OrderSide.SELL });
     } catch (error) {
-      console.error('Error fetching trades:', error);
+      console.error("Error executing simple trading strategy:", error);
     }
   }
 
-  static async storeTrades(trades: TradeResult[]) {
-    try {
-      await TradeModel.insertMany(trades);
-    } catch (error) {
-      console.error('Error storing trades:', error);
-    }
+  static #isBuying({ treshold, latestPrice, previousPrice }: IBuyingOrSellingOptions): boolean {
+    return latestPrice < calculatedPriceWithTreshold(previousPrice, -treshold);
   }
 
-  static async buyOrSellOrders({ symbol, dropTreshold, riseTreshold, quantity }: IBuyOrSellOrdersOptions) {
-    try {
-      const lastTrade = await Trader.getLastTrade();
-      if (!lastTrade) throw new Error('No trades found');
-
-      const currentPrice = parseFloat(lastTrade.price);
-
-      if (this.#shouldBuy(currentPrice, dropTreshold)) return await this.#buyOrder(symbol, currentPrice, quantity);
-      if (this.#shouldSell(currentPrice, riseTreshold)) return await this.#sellOrder(symbol, currentPrice, quantity);
-    } catch (error) {
-      console.error('Error executing simple trading strategy:', error);
-    }
-  }
-
-  static #shouldBuy(currentPrice: number, dropTreshold: number): boolean {
-    return !this.#lastBuyPrice || currentPrice < this.#lastBuyPrice * (1 - dropTreshold / 100);
-  }
-
-  static async #buyOrder(symbol: CryptoSymbol, currentPrice: number, quantity: number) {
-    this.#lastBuyPrice = currentPrice;
-    console.log('Buying at:', this.#calculateCryptoCost(this.#lastBuyPrice, quantity));
-
-    await binance.order({
-      symbol,
-      side: 'BUY',
-      type: OrderType.MARKET,
-      quantity: '0.001',
-    });
-  }
-
-  static #shouldSell(currentPrice: number, riseTreshold: number): boolean {
-    return this.#lastBuyPrice && currentPrice > this.#lastBuyPrice * (1 + riseTreshold / 100) ? true : false;
-  }
-
-  static async #sellOrder(symbol: CryptoSymbol, currentPrice: number, quantity: number) {
-    this.#lastBuyPrice = null;
-    console.log('Selling at:', this.#calculateCryptoCost(currentPrice, quantity));
-
-    await binance.order({
-      symbol,
-      side: 'SELL',
-      type: OrderType.MARKET,
-      quantity: '0.001',
-    });
+  static #isSelling({ treshold, latestPrice, previousPrice }: IBuyingOrSellingOptions): boolean {
+    return latestPrice > calculatedPriceWithTreshold(previousPrice, treshold);
   }
 }
