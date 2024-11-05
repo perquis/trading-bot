@@ -1,11 +1,12 @@
 import { Trader } from "@/bot/trader";
 import { connectWithMongoDb } from "@/db/mongodb";
 import { CryptoSymbol } from "@/enums/crypto-symbol";
+import { scheduler } from "@/jobs/scheduler";
 import { services } from "@/services";
 
 connectWithMongoDb();
 
-setInterval(async () => {
+scheduler.run(async () => {
   const trades = await services.trades.getTrades(CryptoSymbol.BTCUSDT);
   await services.trades.storeTradesInDatabase(trades!);
 
@@ -15,4 +16,4 @@ setInterval(async () => {
     riseTreshold: 1,
     quantity: 0.01,
   });
-}, 1000);
+});
