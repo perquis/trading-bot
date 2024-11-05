@@ -1,7 +1,8 @@
 import { CryptoSymbol } from "@/enums/crypto-symbol";
+import { IOrder } from "@/interfaces/order.interface";
 import mongoose, { Schema } from "mongoose";
 
-const orderSchema = new Schema(
+const orderSchema = new Schema<IOrder>(
   {
     symbol: {
       type: String,
