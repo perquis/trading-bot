@@ -1,7 +1,7 @@
 import { CronJob } from "cron";
 
 export const scheduler = {
-  run: (onTick: () => void, cronTime = "* * * * *") => {
+  createScheduledJob: (onTick: () => void, cronTime = "* * * * *") => {
     try {
       CronJob.from({
         cronTime,
