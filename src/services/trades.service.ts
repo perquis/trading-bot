@@ -21,7 +21,11 @@ export const trades = {
   },
 
   async getLastTrade() {
-    const trade = await TradeModel.findOne().sort({ time: -1 }).lean();
-    return trade;
+    try {
+      const trade = await TradeModel.findOne().sort({ time: -1 }).lean();
+      return trade;
+    } catch (error) {
+      console.error("Error fetching last trade:", error);
+    }
   },
 };

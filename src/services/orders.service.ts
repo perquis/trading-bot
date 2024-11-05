@@ -10,21 +10,25 @@ export const orders = {
   },
 
   async createOrder({ symbol, price, side, quantity }: ICreateOrderOptions) {
-    const purchasePrice = currencyFormat(price, quantity);
+    try {
+      const purchasePrice = currencyFormat(price, quantity);
 
-    await OrderModel.create({
-      symbol,
-      price,
-      quantity,
-      purchasePrice,
-      side,
-    });
+      await OrderModel.create({
+        symbol,
+        price,
+        quantity,
+        purchasePrice,
+        side,
+      });
 
-    await binance.order({
-      symbol,
-      side,
-      type: OrderType.MARKET,
-      quantity: String(quantity),
-    });
+      await binance.order({
+        symbol,
+        side,
+        type: OrderType.MARKET,
+        quantity: String(quantity),
+      });
+    } catch (error) {
+      console.error("Error creating order:", error);
+    }
   },
 };
