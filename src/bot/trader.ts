@@ -7,9 +7,8 @@ export class Trader {
   static async init({ symbol, dropTreshold, riseTreshold, quantity }: IBuyOrSellOrdersOptions) {
     try {
       const lastTrade = await services.trades.getLastTrade();
-      if (!lastTrade) throw new Error("No trades found");
 
-      const latestPrice = parseFloat(lastTrade.price),
+      const latestPrice = parseFloat(lastTrade!.price),
         newOrder = {
           symbol,
           price: latestPrice,
@@ -27,9 +26,7 @@ export class Trader {
         isSelling = this.#isSelling({ treshold: riseTreshold, ...buyingOrSellingOptions });
 
       if (isBuying && lastOrder.side === OrderSide.SELL) return await services.orders.createOrder(newOrder);
-
-      if (isSelling && lastOrder.side === OrderSide.BUY)
-        return await services.orders.createOrder({ ...newOrder, side: OrderSide.SELL });
+      if (isSelling && lastOrder.side === OrderSide.BUY) return await services.orders.createOrder({ ...newOrder, side: OrderSide.SELL });
     } catch (error) {
       console.error("Error executing simple trading strategy:", error);
     }
