@@ -8,7 +8,9 @@ export interface ICryptocurrencyOptions {
 }
 
 export interface IOrderDetails {
-  latestPrice: number;
+  newestPrice: number;
   previousPrice: number;
   treshold: number;
 }
+
+export type ICryptocurrencyOptionsWithoutTresholds = Omit<ICryptocurrencyOptions, "dropTreshold" | "riseTreshold">;

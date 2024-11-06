@@ -31,6 +31,7 @@ export const trades = {
       return trade;
     } catch (error) {
       console.error("Error fetching last trade:", error);
+      return null;
     }
   },
 };
