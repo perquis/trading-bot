@@ -3,7 +3,7 @@ import { services } from "@/services";
 import { calculatedPriceWithTreshold } from "@/utils/calculated-price-with-treshold";
 import { OrderSide } from "binance-api-node";
 
-export class Trader {
+export class CryptoTrader {
   static async init({ symbol, quantity, dropTreshold, riseTreshold }: ICryptocurrencyOptions) {
     try {
       const lastTrade = await services.trades.getLastTrade(symbol);
