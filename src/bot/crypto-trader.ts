@@ -1,80 +1,90 @@
 import { CryptoSymbol } from "@/enums/crypto-symbol";
-import { ICryptocurrencyOptions, ICryptocurrencyOptionsWithoutTresholds } from "@/interfaces/bot-trader.interface";
+import { ICryptocurrencyOptions } from "@/interfaces/bot-trader.interface";
 import { ICreateOrderOptions, IOrder } from "@/interfaces/order.interface";
 import { ITrade } from "@/interfaces/trade.interface";
 import { services } from "@/services";
 import { calculatedPriceWithTreshold } from "@/utils/calculated-price-with-treshold";
 import { OrderSide } from "binance-api-node";
 
-export class CryptoTrader {
-  static #newestPrice: number = 0;
-  static #lastTrade: ITrade | null = null;
-  static #lastOrder: IOrder | null = null;
+export class CryptoTraderFactory {
+  static async create(symbol: CryptoSymbol, options: ICryptocurrencyOptions) {
+    const trader = new CryptoTrader(symbol, options);
+    await trader.init();
+  }
+}
 
-  static async init({ symbol, ...options }: ICryptocurrencyOptions) {
+class CryptoTrader {
+  #newestPrice: number = 0;
+  #lastTrade: ITrade | null = null;
+  #lastOrder: IOrder | null = null;
+
+  constructor(private symbol: CryptoSymbol, private options: ICryptocurrencyOptions) {}
+
+  async init() {
     try {
-      const isBlockedTrading = await services.blockers.isBlockedTrading(symbol);
+      const isBlockedTrading = await services.blockers.isBlockedTrading(this.symbol);
       if (isBlockedTrading) return;
 
-      this.#lastTrade = await services.trades.getLastTrade(symbol);
-      this.#lastOrder = await services.orders.getLastOrder(symbol);
+      this.#lastTrade = await services.trades.getLastTrade(this.symbol);
+      this.#lastOrder = await services.orders.getLastOrder(this.symbol);
 
       this.#newestPrice = parseFloat(this.#lastTrade!.price);
 
-      await this.#update({ symbol, ...options });
+      await this.#update();
     } catch (error) {
       console.error("Error executing simple trading strategy:", error);
     }
   }
 
-  static async #update({ symbol, quantity, riseTreshold, dropTreshold }: ICryptocurrencyOptions) {
-    const initialOrder = this.#createInitialOrderOptions({ symbol, quantity });
+  async #update() {
+    const initialOrder = this.#createInitialOrderOptions();
 
     if (this.#isNotExistingAnyOrder()) return await services.orders.createOrder(initialOrder);
-    if (this.#isBuyingCryptocurrency(dropTreshold)) return await services.orders.createOrder(initialOrder);
+    if (this.#isBuyingCryptocurrency()) return await services.orders.createOrder(initialOrder);
 
     initialOrder.side = OrderSide.SELL;
 
-    if (this.#isSellingCryptocurrency(riseTreshold)) return await services.orders.createOrder(initialOrder);
-    if (this.#isSellingWhenPriceIsDroppingTooMuch()) return await this.#blockTrading(symbol, initialOrder);
+    if (this.#isSellingCryptocurrency()) return await services.orders.createOrder(initialOrder);
+    if (this.#isSellingWhenPriceIsDroppingTooMuch()) return await this.#blockTrading(initialOrder);
   }
 
-  static #createInitialOrderOptions({ symbol, quantity }: ICryptocurrencyOptionsWithoutTresholds): ICreateOrderOptions {
+  #createInitialOrderOptions(): ICreateOrderOptions {
     return {
-      symbol,
+      symbol: this.symbol,
       price: this.#newestPrice,
       side: OrderSide.BUY,
-      quantity,
+      quantity: this.options.quantity,
     };
   }
 
-  static #isNotExistingAnyOrder(): boolean {
+  #isNotExistingAnyOrder(): boolean {
     return !this.#lastOrder;
   }
 
-  static #isEqualsSide(side: OrderSide): boolean {
+  #isEqualsSide(side: OrderSide): boolean {
     return this.#lastOrder!.side === side;
   }
 
-  static #isBuyingCryptocurrency(treshold: number): boolean {
-    return this.#comparePriceIfIsHigherOrLower(-treshold) && this.#isEqualsSide(OrderSide.SELL);
+  #isBuyingCryptocurrency(): boolean {
+    return this.#comparePriceIfIsHigherOrLower(-this.options.dropTreshold) && this.#isEqualsSide(OrderSide.SELL);
   }
 
-  static #isSellingCryptocurrency(treshold: number): boolean {
-    return this.#comparePriceIfIsHigherOrLower(treshold) && this.#isEqualsSide(OrderSide.BUY);
+  #isSellingCryptocurrency(): boolean {
+    return this.#comparePriceIfIsHigherOrLower(this.options.riseTreshold) && this.#isEqualsSide(OrderSide.BUY);
   }
 
-  static #isSellingWhenPriceIsDroppingTooMuch(): boolean {
-    return this.#comparePriceIfIsHigherOrLower(-5) && this.#isEqualsSide(OrderSide.BUY);
+  #isSellingWhenPriceIsDroppingTooMuch(): boolean {
+    const percentage = -5 - this.options.dropTreshold;
+    return this.#comparePriceIfIsHigherOrLower(percentage) && this.#isEqualsSide(OrderSide.BUY);
   }
 
-  static #comparePriceIfIsHigherOrLower(treshold: number): boolean {
+  #comparePriceIfIsHigherOrLower(treshold: number): boolean {
     if (treshold > 0) return this.#newestPrice > calculatedPriceWithTreshold(this.#lastOrder!.price, treshold);
     return this.#newestPrice < calculatedPriceWithTreshold(this.#lastOrder!.price, treshold);
   }
 
-  static async #blockTrading(symbol: CryptoSymbol, newOrder: ICreateOrderOptions): Promise<void> {
-    await services.blockers.createBlocker(symbol);
+  async #blockTrading(newOrder: ICreateOrderOptions): Promise<void> {
+    await services.blockers.createBlocker(this.symbol);
     return await services.orders.createOrder(newOrder);
   }
 }
